@@ -200,18 +200,44 @@ export function mapCallExpression(
 ) {
   let expression: CallExpression = new CallExpression();
   let propExpr = <ts.PropertyAccessExpression>node.expression;
-  if (propExpr.expression.kind === ts.SyntaxKind.ThisKeyword) {
-    expression.setIdentifier('this');
+
+  if ((<ts.Identifier>node.expression).text) {
+    expression.setIdentifier((<ts.Identifier>node.expression).text);
+    if (node.name) {
+      expression.setName((<ts.Identifier>node.name).text);
+    }
   } else {
-    expression.setIdentifier((<ts.Identifier>propExpr.expression).text);
+    let innerPropExpr: any = propExpr.expression;
+    let thisToken = '';
+    if (isThisKeywordPresent(innerPropExpr)) {
+      thisToken = 'this';
+    }
+    if ((<ts.PropertyAccessExpression>propExpr.expression).name) {
+      expression.setIdentifier(
+        thisToken +
+          (<ts.PropertyAccessExpression>propExpr.expression).name.text,
+      );
+    } else {
+      expression.setIdentifier(
+        thisToken + (<ts.Identifier>propExpr.expression).text,
+      );
+    }
+    expression.setName((<ts.Identifier>propExpr.name).text);
   }
-  expression.setName((<ts.Identifier>propExpr.name).text);
+
   if (node.arguments) {
     mapArguments(node.arguments, sourceFile).forEach((arg) => {
       expression.addArgument(arg);
     });
   }
   return expression;
+}
+
+function isThisKeywordPresent(innerPropExpr: any) {
+  return (
+    innerPropExpr.kind === ts.SyntaxKind.ThisKeyword ||
+    innerPropExpr.expression.kind === ts.SyntaxKind.ThisKeyword
+  );
 }
 
 export function mapArguments(
@@ -244,6 +270,12 @@ export function mapArguments(
           bodyMethod.setIsArrowFunction(true);
           argumentsArray.push(bodyMethod);
         }
+        break;
+      case ts.SyntaxKind.CallExpression:
+      case ts.SyntaxKind.PropertyAccessExpression:
+        argumentsArray.push(
+          mapCallExpression(<ts.CallExpression>argument, sourceFile),
+        );
         break;
     }
   });

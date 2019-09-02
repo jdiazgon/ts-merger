@@ -237,4 +237,63 @@ describe('Merging class methods', () => {
       ).length.to.be.greaterThan(0, 'f should have modifier from base');
     });
   });
+
+  describe('should merge function calls', () => {
+    const base = `class a {
+      @Effect()
+      loadData: Observable<Action> = this.actions.pipe(
+        ofType(SampleDataActionTypes.LOAD_DATA),
+        map((action: LoadData) => action.payload),
+        switchMap((payload: any) => {
+          return this.sampledataservice
+            .getSampleData(
+              payload.size,
+              payload.page,
+            )
+            .pipe(
+              map(
+                (sampledataRes: HttpResponseModel) =>
+                  new LoadDataSuccess(sampledataRes),
+              ),
+              catchError((error: Error) => of(new LoadDataFail({ error: error }))),
+            );
+        }),
+      );
+    }`,
+      patch = `class a {
+      @Effect()
+      loadData: Observable<Action> = this.actions.pipe(
+        ofType(SampleDataActionTypes.LOAD_DATA),
+        map((action: LoadData) => action.payload),
+        switchMap((payload: any) => {
+          return this.sampledataservice
+            .getSampleData(
+              payload.size,
+              payload.bla,
+            )
+            .pipe(
+              map(
+                (sampledataRes: HttpResponseModel) =>
+                  new LoadDataSuccess(sampledataRes),
+              ),
+              catchError((error: Error) => of(new LoadDataFail({ error: error }))),
+            );
+        }),
+      );
+    }`;
+    it('having two destructuring array values.', () => {
+      const result: String[] = merge(base, patch, false)
+        .split('\n')
+        .map((value) => value.trim())
+        .filter((value) => value != '');
+      expect(
+        result.filter((res) => /bla\s*:\s*...this.bla,/.test(res.toString())),
+      ).length.to.be.greaterThan(0, 'f should have modifier from base');
+      expect(
+        result.filter((res) =>
+          /searchTerms\s*:\s*...this.searchTerms/.test(res.toString()),
+        ),
+      ).length.to.be.greaterThan(0, 'f should have modifier from base');
+    });
+  });
 });
